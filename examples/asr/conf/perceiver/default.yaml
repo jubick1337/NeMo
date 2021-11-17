@@ -1,0 +1,115 @@
+name: &name "PerceiverASR"
+sample_rate: &sample_rate 16000
+
+model:
+  train_ds:
+    manifest_filepath: ./librispeech/train_clean_100.json,./librispeech/train_clean_360.json
+    sample_rate: 16000
+    batch_size: 16
+    num_workers: 24
+    shuffle: True
+
+  test_ds:
+    manifest_filepath: librispeech/test_clean.json
+    sample_rate: 16000
+    batch_size: 16
+    num_workers: 24
+    shuffle: False
+
+  validation_ds:
+    manifest_filepath: librispeech/dev_clean.json
+    sample_rate: 16000
+    batch_size: 16
+    num_workers: 24
+    shuffle: False
+
+  tokenizer:
+    dir: tokenizers/tokenizer_spe_bpe_v256  # path to directory which contains either tokenizer.model (bpe) or vocab.txt (for wpe)
+    type: bpe  # Can be either bpe or wpe
+
+
+  preprocessor:
+    _target_: nemo.collections.asr.modules.AudioToMelSpectrogramPreprocessor
+    normalize: "per_feature"
+    window_size: 0.02
+    sample_rate: *sample_rate
+    window_stride: 0.01
+    window: "hann"
+    features: &n_mels 128
+    n_fft: 512
+    frame_splicing: 1
+    dither: 0.00001
+
+  spec_augment:
+    _target_: nemo.collections.asr.modules.SpectrogramAugmentation
+    freq_masks: 2 # set to zero to disable it
+    # you may use lower time_masks for smaller models to have a faster convergence
+    time_masks: 10 # set to zero to disable it
+    freq_width: 27
+    time_width: 0.05
+
+  encoder:
+    _target_: nemo.collections.asr.modules.PerceiverEncoder
+    features_in: *n_mels
+    inner_size: 256
+    ca_num_heads: 2
+    ca_num_layers: 2
+    self_attn_num_heads: 2
+    self_attn_num_layers: 2
+    depth: 16
+
+
+  decoder:
+    _target_: nemo.collections.asr.modules.ConvASRDecoder
+    feat_in: 256
+    num_classes: -1
+    vocabulary: [ ]
+
+  optim:
+    name: adamw
+    lr: 2.0
+    # optimizer arguments
+    betas: [ 0.9, 0.98 ]
+    # less necessity for weight_decay as we already have large augmentations with SpecAug
+    # you may need weight_decay for large models, stable AMP training, small datasets, or when lower augmentations are used
+    # weight decay of 0.0 with lr of 2.0 also works fine
+    weight_decay: 1e-3
+
+    # scheduler setup
+    sched:
+      name: NoamAnnealing
+      d_model: 512
+      # scheduler config override
+      warmup_steps: 10000
+      warmup_ratio: null
+      min_lr: 1e-6
+
+trainer:
+  gpus: 2 # number of gpus
+  max_epochs: 1000
+  max_steps: null # computed at runtime if not set
+  num_nodes: 1
+  accelerator: ddp
+  accumulate_grad_batches: 1
+  checkpoint_callback: False  # Provided by exp_manager
+  logger: False  # Provided by exp_manager
+  log_every_n_steps: 1  # Interval of logging.
+  val_check_interval: 1.0 # Set to 0.25 to check 4 times per epoch, or an int for number of iterations
+
+exp_manager:
+  exp_dir: ./
+  name: *name
+  create_tensorboard_logger: True
+  create_checkpoint_callback: True
+  create_wandb_logger: False
+  wandb_logger_kwargs:
+    name: null
+    project: null
+
+hydra:
+  run:
+    dir: .
+  job_logging:
+    root:
+      handlers: null
+
