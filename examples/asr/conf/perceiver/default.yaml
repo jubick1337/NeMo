@@ -1,75 +1,91 @@
-name: &name "PerceiverASR"
-sample_rate: &sample_rate 16000
+name: "PerceiverASR"
 
 model:
+  sample_rate: 16000
+  log_prediction: true # enables logging sample predictions in the output during training
+  ctc_reduction: 'mean_batch'
+
   train_ds:
     manifest_filepath: ./librispeech/train_clean_100.json,./librispeech/train_clean_360.json
-    sample_rate: 16000
-    batch_size: 16
+    sample_rate: ${model.sample_rate}
+    batch_size: 16 # you may increase batch_size if your memory allows
+    shuffle: true
     num_workers: 24
-    shuffle: True
-
-  test_ds:
-    manifest_filepath: librispeech/test_clean.json
-    sample_rate: 16000
-    batch_size: 16
-    num_workers: 24
-    shuffle: False
+    pin_memory: true
+    use_start_end_token: false
+    trim_silence: false
+    max_duration: 16.7 # it is set for LibriSpeech, you may need to update it for your dataset
+    min_duration: 0.1
 
   validation_ds:
     manifest_filepath: librispeech/dev_clean.json
-    sample_rate: 16000
-    batch_size: 16
+    sample_rate: ${model.sample_rate}
+    batch_size: 16 # you may increase batch_size if your memory allows
+    shuffle: false
     num_workers: 24
-    shuffle: False
+    pin_memory: true
+    use_start_end_token: false
 
+  test_ds:
+    manifest_filepath: librispeech/test_clean.json
+    sample_rate: ${model.sample_rate}
+    batch_size: 16 # you may increase batch_size if your memory allows
+    shuffle: false
+    num_workers: 24
+    pin_memory: true
+    use_start_end_token: false
+
+  # recommend small vocab size of 128 or 256 when using 4x sub-sampling
+  # you may find more detail on how to train a tokenizer at: /scripts/tokenizers/process_asr_text_tokenizer.py
   tokenizer:
-    dir: tokenizers/tokenizer_spe_bpe_v256  # path to directory which contains either tokenizer.model (bpe) or vocab.txt (for wpe)
-    type: bpe  # Can be either bpe or wpe
-
+    dir: tokenizers/tokenizer_spe_bpe_v256  # path to directory which contains either tokenizer.model (bpe) or vocab.txt (wpe)
+    type: bpe  # Can be either bpe (SentencePiece tokenizer) or wpe (WordPiece tokenizer)
 
   preprocessor:
     _target_: nemo.collections.asr.modules.AudioToMelSpectrogramPreprocessor
+    sample_rate: ${model.sample_rate}
     normalize: "per_feature"
-    window_size: 0.02
-    sample_rate: *sample_rate
+    window_size: 0.025
     window_stride: 0.01
     window: "hann"
-    features: &n_mels 128
+    features: 80
     n_fft: 512
+    log: true
     frame_splicing: 1
     dither: 0.00001
+    pad_to: 0
+    pad_value: 0.0
 
   spec_augment:
     _target_: nemo.collections.asr.modules.SpectrogramAugmentation
-    freq_masks: 2 # set to zero to disable it
+    freq_masks: 0 # set to zero to disable it
     # you may use lower time_masks for smaller models to have a faster convergence
-    time_masks: 10 # set to zero to disable it
+    time_masks: 0 # set to zero to disable it
     freq_width: 27
     time_width: 0.05
 
   encoder:
     _target_: nemo.collections.asr.modules.PerceiverEncoder
-    features_in: *n_mels
+    features_in: ${model.preprocessor.features}
     inner_size: 256
     ca_num_heads: 2
     ca_num_layers: 2
     self_attn_num_heads: 2
     self_attn_num_layers: 2
-    depth: 16
+    depth: 20
 
 
   decoder:
     _target_: nemo.collections.asr.modules.ConvASRDecoder
-    feat_in: 256
+    feat_in: ${model.encoder.inner_size}
     num_classes: -1
-    vocabulary: [ ]
+    vocabulary: []
 
   optim:
     name: adamw
-    lr: 2.0
+    lr: 0.01
     # optimizer arguments
-    betas: [ 0.9, 0.98 ]
+    betas: [0.9, 0.98]
     # less necessity for weight_decay as we already have large augmentations with SpecAug
     # you may need weight_decay for large models, stable AMP training, small datasets, or when lower augmentations are used
     # weight decay of 0.0 with lr of 2.0 also works fine
@@ -78,38 +94,50 @@ model:
     # scheduler setup
     sched:
       name: NoamAnnealing
-      d_model: 512
+      d_model: ${model.encoder.inner_size}
       # scheduler config override
       warmup_steps: 10000
       warmup_ratio: null
       min_lr: 1e-6
 
 trainer:
-  gpus: 2 # number of gpus
+  gpus: 2 # number of GPUs, -1 would use all available GPUs
+  num_nodes: 1
   max_epochs: 1000
   max_steps: null # computed at runtime if not set
-  num_nodes: 1
-  accelerator: ddp
-  accumulate_grad_batches: 1
-  checkpoint_callback: False  # Provided by exp_manager
-  logger: False  # Provided by exp_manager
-  log_every_n_steps: 1  # Interval of logging.
   val_check_interval: 1.0 # Set to 0.25 to check 4 times per epoch, or an int for number of iterations
+  accelerator: ddp
+  accumulate_grad_batches: 16
+  gradient_clip_val: 0.0
+  amp_level: O0 # O1/O2 for mixed precision
+  precision: 32 # Should be set to 16 for O1 and O2 to enable the AMP.
+  log_every_n_steps: 10  # Interval of logging.
+  progress_bar_refresh_rate: 10
+  resume_from_checkpoint: null # The path to a checkpoint file to continue the training, restores the whole state including the epoch, step, LR schedulers, apex, etc.
+  num_sanity_val_steps: 0 # number of steps to perform validation steps for sanity check the validation process before starting the training, setting to 0 disables it
+  check_val_every_n_epoch: 1 # number of evaluations on validation every n epochs
+  sync_batchnorm: true
+  checkpoint_callback: false  # Provided by exp_manager
+  logger: false  # Provided by exp_manager
 
 exp_manager:
   exp_dir: ./
-  name: *name
-  create_tensorboard_logger: True
-  create_checkpoint_callback: True
-  create_wandb_logger: False
+  name: ${name}
+  create_tensorboard_logger: true
+  create_checkpoint_callback: true
+  checkpoint_callback_params:
+    # in case of multiple validation sets, first one is used
+    monitor: "val_wer"
+    mode: "min"
+    save_top_k: 3
+    always_save_nemo: True # saves the checkpoints as nemo files instead of PTL checkpoints
+
+  # you need to set these two to True to continue the training
+  resume_if_exists: false
+  resume_ignore_no_checkpoint: false
+
+  # You may use this section to create a W&B logger
+  create_wandb_logger: false
   wandb_logger_kwargs:
     name: null
     project: null
-
-hydra:
-  run:
-    dir: .
-  job_logging:
-    root:
-      handlers: null
-
