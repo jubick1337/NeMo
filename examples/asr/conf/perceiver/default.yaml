@@ -67,12 +67,12 @@ model:
   encoder:
     _target_: nemo.collections.asr.modules.PerceiverEncoder
     features_in: ${model.preprocessor.features}
-    inner_size: 256
-    ca_num_heads: 2
-    ca_num_layers: 2
-    self_attn_num_heads: 2
-    self_attn_num_layers: 2
-    depth: 32
+    inner_size: 128
+    ca_num_heads: 4
+    ca_num_layers: 4
+    self_attn_num_heads: 4
+    self_attn_num_layers: 4
+    depth: 128
 
 
   decoder:
