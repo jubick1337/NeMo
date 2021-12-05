@@ -13,7 +13,7 @@
 # limitations under the License.
 import copy
 from collections import OrderedDict
-from math import pi
+from math import pi, log
 
 import torch
 
@@ -29,7 +29,7 @@ def fourier_encode(x, max_freq, num_bands=4):
     x = x.unsqueeze(-1)
     device, dtype, orig_x = x.device, x.dtype, x
 
-    scales = torch.linspace(1., max_freq / 2, num_bands, device=device, dtype=dtype)
+    scales = torch.logspace(1., log(max_freq / 2) / log(2), num_bands, base=2, device=device, dtype=dtype)
     scales = scales[(*((None,) * (len(x.shape) - 1)), Ellipsis)]
 
     x = x * scales * pi
