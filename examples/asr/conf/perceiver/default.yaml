@@ -8,7 +8,7 @@ model:
   train_ds:
     manifest_filepath: ./librispeech/train_clean_100.json,./librispeech/train_clean_360.json
     sample_rate: ${model.sample_rate}
-    batch_size: 16 # you may increase batch_size if your memory allows
+    batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: true
     num_workers: 24
     pin_memory: true
@@ -72,7 +72,7 @@ model:
     ca_num_layers: 2
     self_attn_num_heads: 2
     self_attn_num_layers: 2
-    depth: 20
+    depth: 32
 
 
   decoder:
