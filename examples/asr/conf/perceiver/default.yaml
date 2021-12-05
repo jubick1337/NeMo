@@ -83,7 +83,7 @@ model:
 
   optim:
     name: adamw
-    lr: 0.01
+    lr: ???
     # optimizer arguments
     betas: [0.9, 0.98]
     # less necessity for weight_decay as we already have large augmentations with SpecAug
@@ -101,7 +101,7 @@ model:
       min_lr: 1e-6
 
 trainer:
-  gpus: 2 # number of GPUs, -1 would use all available GPUs
+  gpus: ??? # number of GPUs, -1 would use all available GPUs
   num_nodes: 1
   max_epochs: 1000
   max_steps: null # computed at runtime if not set
