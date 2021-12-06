@@ -43,7 +43,8 @@ class PerceiverEncoder(NeuralModule, Exportable):
                  self_attn_num_heads: int, self_attn_num_layers: int, depth: int):
         # N - MelSpec feature number D - small size
         super().__init__()
-        self.latent_array = torch.rand(size=(features_in, inner_size), requires_grad=True)
+        self.latent_array = torch.nn.Parameter(torch.nn.init.xavier_normal_(
+            torch.empty(features_in, inner_size)))  # torch.rand(size=(features_in, inner_size), requires_grad=True)
         self.ca = TransformerDecoder(TransformerDecoderLayer(features_in, ca_num_heads, batch_first=True), 1)
 
         encoder_layer = TransformerEncoder(TransformerEncoderLayer(features_in, self_attn_num_heads, batch_first=True),
