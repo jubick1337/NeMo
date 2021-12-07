@@ -11,99 +11,117 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import copy
-from collections import OrderedDict
-from math import pi, log
 
 import torch
 
+from nemo.collections.nlp.modules.common.transformer.transformer_decoders import TransformerDecoder
+from nemo.collections.nlp.modules.common.transformer.transformer_encoders import TransformerEncoder
+from nemo.collections.nlp.modules.common.transformer.transformer_modules import AttentionBridge
+
 __all__ = ["PerceiverEncoder"]
 
-from torch.nn import TransformerDecoder, TransformerDecoderLayer, TransformerEncoder, TransformerEncoderLayer
 
-from nemo.core import NeuralModule, Exportable, typecheck
-from nemo.core.neural_types import NeuralType, SpectrogramType, LengthsType, AcousticEncodedRepresentation
-
-
-def fourier_encode(x, max_freq, num_bands=4):
-    x = x.unsqueeze(-1)
-    device, dtype, orig_x = x.device, x.dtype, x
-
-    scales = torch.logspace(1., log(max_freq / 2) / log(2), num_bands, base=2, device=device, dtype=dtype)
-    scales = scales[(*((None,) * (len(x.shape) - 1)), Ellipsis)]
-
-    x = x * scales * pi
-    x = torch.cat([x.sin(), x.cos()], dim=-1)
-    x = torch.cat((x, orig_x), dim=-1)
-    return x
-
-
-class PerceiverEncoder(NeuralModule, Exportable):
-    def __init__(self, features_in: int, inner_size: int, ca_num_heads: int, ca_num_layers: int,
-                 self_attn_num_heads: int, self_attn_num_layers: int, depth: int):
-        # N - MelSpec feature number D - small size
+class PerceiverEncoder(torch.nn.Module):
+    def __init__(
+            self,
+            num_layers: int,
+            hidden_size: int,
+            inner_size: int,
+            mask_future: bool = False,
+            num_attention_heads: int = 1,
+            attn_score_dropout: float = 0.0,
+            attn_layer_dropout: float = 0.0,
+            ffn_dropout: float = 0.0,
+            hidden_act: str = "relu",
+            pre_ln: bool = False,
+            pre_ln_final_layer_norm: bool = True,
+            hidden_steps: int = 32,
+            hidden_init_method: str = "default",
+            hidden_blocks: int = 2,
+    ):
         super().__init__()
-        self.latent_array = torch.nn.Parameter(torch.nn.init.xavier_normal_(
-            torch.empty(features_in, inner_size)))  # torch.rand(size=(features_in, inner_size), requires_grad=True)
-        self.ca = TransformerDecoder(TransformerDecoderLayer(features_in, ca_num_heads, batch_first=True), 1)
 
-        encoder_layer = TransformerEncoder(TransformerEncoderLayer(features_in, self_attn_num_heads, batch_first=True),
-                                           self_attn_num_layers)
-        self.transformer_encoders = torch.nn.ModuleList([copy.deepcopy(encoder_layer) for _ in range(depth)])
-        decoder_layer = TransformerDecoder(TransformerDecoderLayer(features_in, ca_num_heads, batch_first=True),
-                                           ca_num_layers)
-        self.cross_attention_encoders = torch.nn.ModuleList(
-            [copy.deepcopy(decoder_layer) for _ in range(depth)])
+        self._hidden_steps = hidden_steps
+        self._hidden_init_method = hidden_init_method
+        self._hidden_blocks = hidden_blocks
 
-    @property
-    def input_types(self):
-        """Returns definitions of module input ports.
-        """
-        return OrderedDict(
-            {
-                "audio_signal":
-                    NeuralType(('B', 'D', 'T'), SpectrogramType()),
-                "length": NeuralType(tuple('B'), LengthsType()),
-            }
-        )
+        if self._hidden_init_method == "default":
+            self._hidden_init_method = "params"
 
-    @property
-    def output_types(self):
-        """Returns definitions of module output ports.
-        """
-        return OrderedDict(
-            {
-                "outputs": NeuralType(('B', 'D', 'T'), AcousticEncodedRepresentation()),
-                "encoded_lengths": NeuralType(tuple('B'), LengthsType()),
-            }
-        )
-
-    @typecheck()
-    def forward(self, audio_signal, length):
-        audio_signal = audio_signal.unsqueeze(1)
-        batch_size, *axis, _ = audio_signal.shape
-        axis_pos = list(map(lambda size: torch.linspace(-1., 1., steps=size, device=audio_signal.device), axis))
-        pos = torch.stack(torch.meshgrid(*axis_pos), dim=-1)
-        fourier_encoded = fourier_encode(pos, 16000)
-        fourier_encoded = fourier_encoded.view(list(fourier_encoded.shape[:-2]) + [-1])
-        fourier_encoded = torch.cat(batch_size * [fourier_encoded.unsqueeze(0)])
-        audio_and_fe = torch.cat([fourier_encoded, audio_signal], dim=-1)
-        byte_array = torch.cat(batch_size * [self.latent_array.unsqueeze(0).to(audio_signal.device)]).swapaxes(-2, -1)
-        audio_and_fe = audio_and_fe.permute(0, -1, 1, 2).flatten(2)
-        byte_array_mask = torch.zeros(size=(byte_array.shape[1], byte_array.shape[1]),
-                                      device=audio_signal.device).bool()
-        audio_signal_mask = self.make_pad_mask(length, max_time=audio_and_fe.shape[1], device=audio_signal.device)
-        crossed = self.ca(byte_array.to(audio_signal.device), audio_and_fe.to(audio_signal.device),
-                          tgt_mask=byte_array_mask, memory_key_padding_mask=audio_signal_mask)
-
-        for self_att, cross_att in zip(self.transformer_encoders, self.cross_attention_encoders):
-            residual = crossed
-            crossed = cross_att(
-                byte_array, audio_and_fe, tgt_mask=byte_array_mask, memory_key_padding_mask=audio_signal_mask
+        if self.hidden_init_method not in self.supported_init_methods:
+            raise ValueError(
+                "Unknown hidden_init_method = {hidden_init_method}, supported methods are {supported_init_methods}".format(
+                    hidden_init_method=self.hidden_init_method, supported_init_methods=self.supported_init_methods,
+                )
             )
-            crossed = self_att(crossed, byte_array_mask)
-            crossed += residual
-        return crossed, torch.zeros(size=(batch_size,)).int() + self.latent_array.shape[0]
+
+        if self.hidden_init_method == "params":
+            # learnable initial hidden values
+            self.init_hidden = torch.nn.Parameter(torch.nn.init.xavier_normal_(torch.empty(hidden_steps, hidden_size)))
+            self.init_cross_att = TransformerDecoder(
+                num_layers=1,
+                hidden_size=hidden_size,
+                inner_size=inner_size,
+                num_attention_heads=num_attention_heads,
+                attn_score_dropout=attn_score_dropout,
+                attn_layer_dropout=attn_layer_dropout,
+                ffn_dropout=ffn_dropout,
+                hidden_act=hidden_act,
+                pre_ln=pre_ln,
+                pre_ln_final_layer_norm=pre_ln_final_layer_norm,
+            )
+        elif self.hidden_init_method == "bridge":
+            # initialize latent with attention bridge
+            self.att_bridge = AttentionBridge(hidden_size=hidden_size, k=hidden_steps, bridge_size=inner_size, )
+
+        # cross-attention encoder
+        layer = TransformerDecoder(
+            num_layers=1,
+            hidden_size=hidden_size,
+            inner_size=inner_size,
+            num_attention_heads=num_attention_heads,
+            attn_score_dropout=attn_score_dropout,
+            attn_layer_dropout=attn_layer_dropout,
+            ffn_dropout=ffn_dropout,
+            hidden_act=hidden_act,
+            pre_ln=pre_ln,
+            pre_ln_final_layer_norm=pre_ln_final_layer_norm,
+        )
+        self.cross_att_layers = torch.nn.ModuleList([copy.deepcopy(layer) for _ in range(hidden_blocks)])
+
+        # self-attention encoder
+        layer = TransformerEncoder(
+            num_layers=num_layers,
+            hidden_size=hidden_size,
+            inner_size=inner_size,
+            mask_future=mask_future,
+            num_attention_heads=num_attention_heads,
+            attn_score_dropout=attn_score_dropout,
+            attn_layer_dropout=attn_layer_dropout,
+            ffn_dropout=ffn_dropout,
+            hidden_act=hidden_act,
+            pre_ln=pre_ln,
+            pre_ln_final_layer_norm=pre_ln_final_layer_norm,
+        )
+        self.self_att_layers = torch.nn.ModuleList([copy.deepcopy(layer) for _ in range(hidden_blocks)])
+
+    @property
+    def supported_init_methods(self):
+        return ["params", "bridge"]
+
+    @property
+    def hidden_steps(self):
+        return self._hidden_steps
+
+    @property
+    def hidden_blocks(self):
+        return self._hidden_blocks
+
+    @property
+    def hidden_init_method(self):
+        return self._hidden_init_method
 
     @staticmethod
     def make_pad_mask(seq_lens, max_time, device=None):
@@ -118,3 +136,53 @@ class PerceiverEncoder(NeuralModule, Exportable):
         if device:
             mask = mask.to(device)
         return mask
+
+    def forward(self, audio_signal, length):
+        """
+        Args:
+            audio_signal: output of the encoder (B x L_enc x H)
+            length: encoder inputs mask (B x L_enc)
+        """
+        length = self.make_pad_mask(length, length.max(), length.device)
+        audio_signal = audio_signal.transpose(-1, -2)
+
+        # all hidden values are active
+        hidden_mask = torch.ones(
+            audio_signal.shape[0], self._hidden_steps, dtype=length.dtype, device=length.device
+        )
+
+        # initialize hidden state
+        if self._hidden_init_method == "params":
+            # initialize latent with learned parameters
+            hidden_states = self.init_hidden.unsqueeze(0).expand(audio_signal.shape[0], -1, -1)
+            hidden_states = self.init_cross_att(
+                decoder_states=hidden_states,
+                decoder_mask=hidden_mask,
+                encoder_states=audio_signal,
+                encoder_mask=length,
+            )
+        elif self._hidden_init_method == "bridge":
+            # initialize latent with attention bridge
+            hidden_states = self.att_bridge(hidden=audio_signal, hidden_mask=length, )
+
+        # apply block (cross-attention, self-attention) multiple times
+        # for block in range(self._hidden_blocks):
+        for self_att, cross_att in zip(self.self_att_layers, self.cross_att_layers):
+            residual = hidden_states
+
+            # cross attention of hidden over encoder states
+            hidden_states = cross_att(
+                decoder_states=hidden_states,
+                decoder_mask=hidden_mask,
+                encoder_states=audio_signal,
+                encoder_mask=length,
+            )
+
+            # self-attention over hidden
+            hidden_states = self_att(encoder_states=hidden_states, encoder_mask=hidden_mask, )
+
+            # residual connection
+            hidden_states += residual
+
+        hidden_mask = hidden_mask.sum(-1)
+        return hidden_states, hidden_mask
