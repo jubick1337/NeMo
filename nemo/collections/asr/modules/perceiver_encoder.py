@@ -13,8 +13,12 @@
 # limitations under the License.
 
 import copy
+from collections import OrderedDict
 
 import torch
+
+from nemo.core import NeuralModule, Exportable
+from nemo.core.classes.common import typecheck
 
 from nemo.collections.nlp.modules.common.transformer.transformer_decoders import TransformerDecoder
 from nemo.collections.nlp.modules.common.transformer.transformer_encoders import TransformerEncoder
@@ -22,8 +26,10 @@ from nemo.collections.nlp.modules.common.transformer.transformer_modules import 
 
 __all__ = ["PerceiverEncoder"]
 
+from nemo.core.neural_types import NeuralType, SpectrogramType, LengthsType, AcousticEncodedRepresentation
 
-class PerceiverEncoder(torch.nn.Module):
+
+class PerceiverEncoder(NeuralModule, Exportable):
     def __init__(
             self,
             num_layers: int,
@@ -137,12 +143,8 @@ class PerceiverEncoder(torch.nn.Module):
             mask = mask.to(device)
         return mask
 
+    @typecheck()
     def forward(self, audio_signal, length):
-        """
-        Args:
-            audio_signal: output of the encoder (B x L_enc x H)
-            length: encoder inputs mask (B x L_enc)
-        """
         length = self.make_pad_mask(length, length.max(), length.device)
         audio_signal = audio_signal.transpose(-1, -2)
 
@@ -185,4 +187,19 @@ class PerceiverEncoder(torch.nn.Module):
             hidden_states += residual
 
         hidden_mask = hidden_mask.sum(-1)
+        hidden_states = hidden_states.transpose(-1, -2)
         return hidden_states, hidden_mask
+
+    @property
+    def input_types(self):
+        return OrderedDict({
+            'audio_signal': NeuralType(('B', 'D', 'T'), SpectrogramType()),
+            'length': NeuralType(('B',), LengthsType())
+        })
+
+    @property
+    def output_types(self):
+        return OrderedDict({
+            'outputs': NeuralType(('B', 'D', 'T'), AcousticEncodedRepresentation()),
+            'encoded_lengths': NeuralType(('B',), LengthsType())
+        })

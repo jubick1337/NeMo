@@ -6,30 +6,30 @@ model:
   ctc_reduction: 'mean_batch'
 
   train_ds:
-    manifest_filepath: ./librispeech/train_clean_100.json,./librispeech/train_clean_360.json
+    manifest_filepath: librispeech/dev_clean.json #./librispeech/train_clean_100.json,./librispeech/train_clean_360.json
     sample_rate: ${model.sample_rate}
-    batch_size: 8 # you may increase batch_size if your memory allows
+    batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: true
     num_workers: 24
     pin_memory: true
     use_start_end_token: false
     trim_silence: false
-    max_duration: 16.7 # it is set for LibriSpeech, you may need to update it for your dataset
-    min_duration: 0.1
+  #    max_duration: 16.7 # it is set for LibriSpeech, you may need to update it for your dataset
+  #    min_duration: 0.1
 
   validation_ds:
     manifest_filepath: librispeech/dev_clean.json
     sample_rate: ${model.sample_rate}
-    batch_size: 8 # you may increase batch_size if your memory allows
+    batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: false
     num_workers: 24
     pin_memory: true
     use_start_end_token: false
 
   test_ds:
-    manifest_filepath: librispeech/test_clean.json
+    manifest_filepath: librispeech/dev_clean.json #librispeech/test_clean.json
     sample_rate: ${model.sample_rate}
-    batch_size: 8 # you may increase batch_size if your memory allows
+    batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: false
     num_workers: 24
     pin_memory: true
@@ -38,8 +38,8 @@ model:
   # recommend small vocab size of 128 or 256 when using 4x sub-sampling
   # you may find more detail on how to train a tokenizer at: /scripts/tokenizers/process_asr_text_tokenizer.py
   tokenizer:
-    dir: tokenizers/tokenizer_spe_bpe_v256  # path to directory which contains either tokenizer.model (bpe) or vocab.txt (wpe)
-    type: bpe  # Can be either bpe (SentencePiece tokenizer) or wpe (WordPiece tokenizer)
+    dir: tokenizers/tokenizer_wpe_v256  # path to directory which contains either tokenizer.model (bpe) or vocab.txt (wpe)
+    type: wpe  # Can be either bpe (SentencePiece tokenizer) or wpe (WordPiece tokenizer)
 
   preprocessor:
     _target_: nemo.collections.asr.modules.AudioToMelSpectrogramPreprocessor
@@ -48,7 +48,7 @@ model:
     window_size: 0.025
     window_stride: 0.01
     window: "hann"
-    features: 64
+    features: 80
     n_fft: 512
     log: true
     frame_splicing: 1
@@ -56,40 +56,38 @@ model:
     pad_to: 0
     pad_value: 0.0
 
-  spec_augment:
-    _target_: nemo.collections.asr.modules.SpectrogramAugmentation
-    freq_masks: 0 # set to zero to disable it
-    # you may use lower time_masks for smaller models to have a faster convergence
-    time_masks: 0 # set to zero to disable it
-    freq_width: 27
-    time_width: 0.05
+  #  spec_augment:
+  #    _target_: nemo.collections.asr.modules.SpectrogramAugmentation
+  #    freq_masks: 0 # set to zero to disable it
+  #    # you may use lower time_masks for smaller models to have a faster convergence
+  #    time_masks: 0 # set to zero to disable it
+  #    freq_width: 27
+  #    time_width: 0.05
 
   encoder:
     _target_: nemo.collections.asr.modules.PerceiverEncoder
-    features_in: ${model.preprocessor.features}
-    inner_size: 128
-    ca_num_heads: 4
-    ca_num_layers: 4
-    self_attn_num_heads: 4
-    self_attn_num_layers: 4
-    depth: 64
-
+    hidden_size: ${model.preprocessor.features}
+    hidden_init_method: "params"
+    num_layers: 256
+    inner_size: 512
+    hidden_steps: 128
+    hidden_blocks: 1
 
   decoder:
     _target_: nemo.collections.asr.modules.ConvASRDecoder
-    feat_in: ${model.encoder.inner_size}
+    feat_in: ${model.encoder.hidden_size}
     num_classes: -1
-    vocabulary: []
+    vocabulary: [ ]
 
   optim:
     name: adamw
-    lr: ???
+    lr: 2.0
     # optimizer arguments
-    betas: [0.9, 0.98]
+    betas: [ 0.9, 0.98 ]
     # less necessity for weight_decay as we already have large augmentations with SpecAug
     # you may need weight_decay for large models, stable AMP training, small datasets, or when lower augmentations are used
     # weight decay of 0.0 with lr of 2.0 also works fine
-    weight_decay: 1e-3
+    weight_decay: 1e-2
 
     # scheduler setup
     sched:
@@ -101,22 +99,22 @@ model:
       min_lr: 1e-6
 
 trainer:
-  gpus: ??? # number of GPUs, -1 would use all available GPUs
+  gpus: -1 # number of GPUs, -1 would use all available GPUs
   num_nodes: 1
   max_epochs: 1000
   max_steps: null # computed at runtime if not set
   val_check_interval: 1.0 # Set to 0.25 to check 4 times per epoch, or an int for number of iterations
   accelerator: ddp
-  accumulate_grad_batches: 2
+  accumulate_grad_batches: 1
   gradient_clip_val: 1.0
-  amp_level: O1 # O1/O2 for mixed precision
-  precision: 16 # Should be set to 16 for O1 and O2 to enable the AMP.
-  amp_backend: apex
-  log_every_n_steps: 10  # Interval of logging.
-  progress_bar_refresh_rate: 10
+  #  amp_level: O0 # O1/O2 for mixed precision
+  precision: 32 # Should be set to 16 for O1 and O2 to enable the AMP.
+  #  amp_backend: apex
+  log_every_n_steps: 1  # Interval of logging.
+  progress_bar_refresh_rate: 1
   resume_from_checkpoint: null # The path to a checkpoint file to continue the training, restores the whole state including the epoch, step, LR schedulers, apex, etc.
   num_sanity_val_steps: 0 # number of steps to perform validation steps for sanity check the validation process before starting the training, setting to 0 disables it
-  check_val_every_n_epoch: 1 # number of evaluations on validation every n epochs
+  check_val_every_n_epoch: 10 # number of evaluations on validation every n epochs
   sync_batchnorm: true
   checkpoint_callback: false  # Provided by exp_manager
   logger: false  # Provided by exp_manager
