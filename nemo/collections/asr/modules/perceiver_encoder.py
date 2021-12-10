@@ -145,13 +145,15 @@ class PerceiverEncoder(NeuralModule, Exportable):
 
     @typecheck()
     def forward(self, audio_signal, length):
-        length = self.make_pad_mask(length, length.max(), length.device)
+        audio_mask = self.make_pad_mask(length, length.max(), length.device)
         audio_signal = audio_signal.transpose(-1, -2)
 
         # all hidden values are active
         hidden_mask = torch.ones(
             audio_signal.shape[0], self._hidden_steps, dtype=length.dtype, device=length.device
         )
+
+        audio_mask = audio_mask.to(length.dtype)
 
         # initialize hidden state
         if self._hidden_init_method == "params":
@@ -161,11 +163,11 @@ class PerceiverEncoder(NeuralModule, Exportable):
                 decoder_states=hidden_states,
                 decoder_mask=hidden_mask,
                 encoder_states=audio_signal,
-                encoder_mask=length,
+                encoder_mask=audio_mask,
             )
         elif self._hidden_init_method == "bridge":
             # initialize latent with attention bridge
-            hidden_states = self.att_bridge(hidden=audio_signal, hidden_mask=length, )
+            hidden_states = self.att_bridge(hidden=audio_signal, hidden_mask=audio_mask, )
 
         # apply block (cross-attention, self-attention) multiple times
         # for block in range(self._hidden_blocks):
@@ -177,7 +179,7 @@ class PerceiverEncoder(NeuralModule, Exportable):
                 decoder_states=hidden_states,
                 decoder_mask=hidden_mask,
                 encoder_states=audio_signal,
-                encoder_mask=length,
+                encoder_mask=audio_mask,
             )
 
             # self-attention over hidden

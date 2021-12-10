@@ -31,7 +31,7 @@ model:
     sample_rate: ${model.sample_rate}
     batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: false
-    num_workers: 24
+    num_workers: 1
     pin_memory: true
     use_start_end_token: false
 
@@ -56,52 +56,130 @@ model:
     pad_to: 0
     pad_value: 0.0
 
-  #  spec_augment:
-  #    _target_: nemo.collections.asr.modules.SpectrogramAugmentation
-  #    freq_masks: 0 # set to zero to disable it
-  #    # you may use lower time_masks for smaller models to have a faster convergence
-  #    time_masks: 0 # set to zero to disable it
-  #    freq_width: 27
-  #    time_width: 0.05
+  spec_augment:
+    _target_: nemo.collections.asr.modules.SpectrogramAugmentation
+    freq_masks: 2 # set to zero to disable it
+    # you may use lower time_masks for smaller models to have a faster convergence
+    time_masks: 10 # set to zero to disable it
+    freq_width: 27
+    time_width: 0.05
 
   encoder:
     _target_: nemo.collections.asr.modules.PerceiverEncoder
     hidden_size: ${model.preprocessor.features}
     hidden_init_method: "params"
-    num_layers: 256
-    inner_size: 512
-    hidden_steps: 128
+    num_layers: 16 # 16
+    inner_size: 128 # 512
+    hidden_steps: 512
     hidden_blocks: 1
+    num_attention_heads: 4
 
   decoder:
-    _target_: nemo.collections.asr.modules.ConvASRDecoder
-    feat_in: ${model.encoder.hidden_size}
-    num_classes: -1
-    vocabulary: [ ]
+    _target_: nemo.collections.asr.modules.RNNTDecoder
+    normalization_mode: null
+    random_state_sampling: false
+    blank_as_pad: true
+
+    prednet:
+      pred_hidden: 320
+      pred_rnn_layers: 1
+      t_max: null
+      dropout: 0.0
+
+  model_defaults:
+#    repeat: 5
+#    dropout: 0.0
+#    separable: true
+#    se: true
+#    se_context_size: -1
+    # encoder / decoder / joint values
+    enc_hidden: 80
+    pred_hidden: 320
+#    joint_hidden: 320
+
+  joint:
+    _target_: nemo.collections.asr.modules.RNNTJoint
+    log_softmax: null  # sets it according to cpu/gpu device
+
+    # fused mode
+    fuse_loss_wer: false
+    fused_batch_size: 1
+
+    jointnet:
+      joint_hidden: 320
+      activation: "relu"
+      dropout: 0.0
+
+  decoding:
+    strategy: "greedy_batch"
+
+    # greedy strategy config
+    greedy:
+      max_symbols: 30
+
+    # beam strategy config
+    beam:
+      beam_size: 2
+      score_norm: true
+      softmax_temperature: 1.0  # scale the logits by some temperature prior to softmax
+      tsd_max_sym_exp: 10  # for Time Synchronous Decoding, int > 0
+      alsd_max_target_len: 5.0  # for Alignment-Length Synchronous Decoding, float > 1.0
+      maes_num_steps: 2  # for modified Adaptive Expansion Search, int > 0
+      maes_prefix_alpha: 1  # for modified Adaptive Expansion Search, int > 0
+      maes_expansion_beta: 2  # for modified Adaptive Expansion Search, int >= 0
+      maes_expansion_gamma: 2.3  # for modified Adaptive Expansion Search, float >= 0
+
+  loss:
+    loss_name: "default"
+    warprnnt_numba_kwargs:
+      fastemit_lambda: 0.0
 
   optim:
-    name: adamw
-    lr: 2.0
+    name: adam
+    # _target_: nemo.core.optim.optimizers.Adam
+    lr: .1
+
     # optimizer arguments
-    betas: [ 0.9, 0.98 ]
-    # less necessity for weight_decay as we already have large augmentations with SpecAug
-    # you may need weight_decay for large models, stable AMP training, small datasets, or when lower augmentations are used
-    # weight decay of 0.0 with lr of 2.0 also works fine
-    weight_decay: 1e-2
+    betas: [ 0.9, 0.999 ]
+    weight_decay: 0.0001
 
     # scheduler setup
     sched:
-      name: NoamAnnealing
-      d_model: ${model.encoder.inner_size}
+      name: CosineAnnealing
+
       # scheduler config override
-      warmup_steps: 10000
-      warmup_ratio: null
+      warmup_steps: null
+      warmup_ratio: 0.05
       min_lr: 1e-6
+      last_epoch: -1
+#  decoder:
+#    _target_: nemo.collections.asr.modules.ConvASRDecoder
+#    feat_in: ${model.encoder.hidden_size}
+#    num_classes: -1
+#    vocabulary: [ ]
+#
+#  optim:
+#    name: adam
+#    lr: 0.0004
+##    lr: 1.0
+#    # optimizer arguments
+#    # less necessity for weight_decay as we already have large augmentations with SpecAug
+#    # you may need weight_decay for large models, stable AMP training, small datasets, or when lower augmentations are used
+#    # weight decay of 0.0 with lr of 2.0 also works fine
+#    #    weight_decay: 1e-2
+#
+#    # scheduler setup
+#    sched:
+#      name: MultiStepLR
+#      milestones: [ 84, 102, 114 ]
+#      last_epoch: -1 # ${trainer.max_epochs}
+#      verbose: true
+
 
 trainer:
-  gpus: -1 # number of GPUs, -1 would use all available GPUs
+  gpus: 2 # number of GPUs, -1 would use all available GPUs
   num_nodes: 1
-  max_epochs: 1000
+  max_epochs: 5
   max_steps: null # computed at runtime if not set
   val_check_interval: 1.0 # Set to 0.25 to check 4 times per epoch, or an int for number of iterations
   accelerator: ddp
@@ -114,7 +192,7 @@ trainer:
   progress_bar_refresh_rate: 1
   resume_from_checkpoint: null # The path to a checkpoint file to continue the training, restores the whole state including the epoch, step, LR schedulers, apex, etc.
   num_sanity_val_steps: 0 # number of steps to perform validation steps for sanity check the validation process before starting the training, setting to 0 disables it
-  check_val_every_n_epoch: 10 # number of evaluations on validation every n epochs
+  check_val_every_n_epoch: 1 # number of evaluations on validation every n epochs
   sync_batchnorm: true
   checkpoint_callback: false  # Provided by exp_manager
   logger: false  # Provided by exp_manager
