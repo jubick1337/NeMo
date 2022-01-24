@@ -13,10 +13,12 @@
 # limitations under the License.
 
 import copy
+import math
 from collections import OrderedDict
 
 import torch
 
+from nemo.collections.asr.parts.submodules.multi_head_attention import PositionalEncoding
 from nemo.core import NeuralModule, Exportable
 from nemo.core.classes.common import typecheck
 
@@ -78,6 +80,8 @@ class PerceiverEncoder(NeuralModule, Exportable):
                 pre_ln=pre_ln,
                 pre_ln_final_layer_norm=pre_ln_final_layer_norm,
             )
+            ### bug??
+            self.init_cross_att.diagonal = None
         elif self.hidden_init_method == "bridge":
             # initialize latent with attention bridge
             self.att_bridge = AttentionBridge(hidden_size=hidden_size, k=hidden_steps, bridge_size=inner_size, )
@@ -95,6 +99,7 @@ class PerceiverEncoder(NeuralModule, Exportable):
             pre_ln=pre_ln,
             pre_ln_final_layer_norm=pre_ln_final_layer_norm,
         )
+        layer.diagonal = None
         self.cross_att_layers = torch.nn.ModuleList([copy.deepcopy(layer) for _ in range(hidden_blocks)])
 
         # self-attention encoder
@@ -112,6 +117,10 @@ class PerceiverEncoder(NeuralModule, Exportable):
             pre_ln_final_layer_norm=pre_ln_final_layer_norm,
         )
         self.self_att_layers = torch.nn.ModuleList([copy.deepcopy(layer) for _ in range(hidden_blocks)])
+
+        self.pos_enc = PositionalEncoding(
+            d_model=hidden_size, dropout_rate=0.1, max_len=5000, xscale=math.sqrt(hidden_size)
+        )
 
     @property
     def supported_init_methods(self):
@@ -147,7 +156,7 @@ class PerceiverEncoder(NeuralModule, Exportable):
     def forward(self, audio_signal, length):
         audio_mask = self.make_pad_mask(length, length.max(), length.device)
         audio_signal = audio_signal.transpose(-1, -2)
-
+        audio_signal, _ = self.pos_enc(audio_signal)
         # all hidden values are active
         hidden_mask = torch.ones(
             audio_signal.shape[0], self._hidden_steps, dtype=length.dtype, device=length.device
@@ -165,6 +174,7 @@ class PerceiverEncoder(NeuralModule, Exportable):
                 encoder_states=audio_signal,
                 encoder_mask=audio_mask,
             )
+
         elif self._hidden_init_method == "bridge":
             # initialize latent with attention bridge
             hidden_states = self.att_bridge(hidden=audio_signal, hidden_mask=audio_mask, )
