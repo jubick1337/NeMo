@@ -18,7 +18,7 @@ from collections import OrderedDict
 
 import torch
 
-from nemo.collections.asr.parts.submodules.multi_head_attention import PositionalEncoding
+from nemo.collections.asr.parts.submodules.multi_head_attention import PositionalEncoding, RelPositionalEncoding
 from nemo.core import NeuralModule, Exportable
 from nemo.core.classes.common import typecheck
 
@@ -118,8 +118,8 @@ class PerceiverEncoder(NeuralModule, Exportable):
         )
         self.self_att_layers = torch.nn.ModuleList([copy.deepcopy(layer) for _ in range(hidden_blocks)])
 
-        self.pos_enc = PositionalEncoding(
-            d_model=hidden_size, dropout_rate=0.1, max_len=5000, xscale=math.sqrt(hidden_size)
+        self.pos_enc = RelPositionalEncoding(
+            d_model=hidden_size, dropout_rate=0.1, max_len=5000, xscale=True
         )
 
     @property
