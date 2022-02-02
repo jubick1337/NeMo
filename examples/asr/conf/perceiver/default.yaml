@@ -6,10 +6,10 @@ model:
   ctc_reduction: 'mean_batch'
 
   train_ds:
-    manifest_filepath: librispeech/dev_clean.json #./librispeech/train_clean_100.json,./librispeech/train_clean_360.json
+    manifest_filepath: librispeech/dev_clean.json,./librispeech/train_clean_100.json,./librispeech/train_clean_360.json
     sample_rate: ${model.sample_rate}
     batch_size: 32 # you may increase batch_size if your memory allows
-    shuffle: true
+    shuffle: false
     num_workers: 24
     pin_memory: true
     use_start_end_token: false
@@ -31,15 +31,15 @@ model:
     sample_rate: ${model.sample_rate}
     batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: false
-    num_workers: 1
+    num_workers: 24
     pin_memory: true
     use_start_end_token: false
 
   # recommend small vocab size of 128 or 256 when using 4x sub-sampling
   # you may find more detail on how to train a tokenizer at: /scripts/tokenizers/process_asr_text_tokenizer.py
   tokenizer:
-    dir: tokenizers/tokenizer_wpe_v256  # path to directory which contains either tokenizer.model (bpe) or vocab.txt (wpe)
-    type: wpe  # Can be either bpe (SentencePiece tokenizer) or wpe (WordPiece tokenizer)
+    dir: tokenizers/tokenizer_spe_bpe_v1024  # path to directory which contains either tokenizer.model (bpe) or vocab.txt (wpe)
+    type: bpe  # Can be either bpe (SentencePiece tokenizer) or wpe (WordPiece tokenizer)
 
   preprocessor:
     _target_: nemo.collections.asr.modules.AudioToMelSpectrogramPreprocessor
@@ -68,76 +68,23 @@ model:
     _target_: nemo.collections.asr.modules.PerceiverEncoder
     hidden_size: ${model.preprocessor.features}
     hidden_init_method: "params"
-    num_layers: 16 # 16
-    inner_size: 128 # 512
-    hidden_steps: 512
-    hidden_blocks: 1
+    num_layers: 16 # 16 increase
+    inner_size: 512 # 512 increase
+    hidden_steps: 256 # maybe
+    hidden_blocks: 8 # not much
     num_attention_heads: 4
+    proj_size: 256
 
   decoder:
-    _target_: nemo.collections.asr.modules.RNNTDecoder
-    normalization_mode: null
-    random_state_sampling: false
-    blank_as_pad: true
-
-    prednet:
-      pred_hidden: 320
-      pred_rnn_layers: 1
-      t_max: null
-      dropout: 0.0
-
-  model_defaults:
-#    repeat: 5
-#    dropout: 0.0
-#    separable: true
-#    se: true
-#    se_context_size: -1
-    # encoder / decoder / joint values
-    enc_hidden: 80
-    pred_hidden: 320
-#    joint_hidden: 320
-
-  joint:
-    _target_: nemo.collections.asr.modules.RNNTJoint
-    log_softmax: null  # sets it according to cpu/gpu device
-
-    # fused mode
-    fuse_loss_wer: false
-    fused_batch_size: 1
-
-    jointnet:
-      joint_hidden: 320
-      activation: "relu"
-      dropout: 0.0
-
-  decoding:
-    strategy: "greedy_batch"
-
-    # greedy strategy config
-    greedy:
-      max_symbols: 30
-
-    # beam strategy config
-    beam:
-      beam_size: 2
-      score_norm: true
-      softmax_temperature: 1.0  # scale the logits by some temperature prior to softmax
-      tsd_max_sym_exp: 10  # for Time Synchronous Decoding, int > 0
-      alsd_max_target_len: 5.0  # for Alignment-Length Synchronous Decoding, float > 1.0
-      maes_num_steps: 2  # for modified Adaptive Expansion Search, int > 0
-      maes_prefix_alpha: 1  # for modified Adaptive Expansion Search, int > 0
-      maes_expansion_beta: 2  # for modified Adaptive Expansion Search, int >= 0
-      maes_expansion_gamma: 2.3  # for modified Adaptive Expansion Search, float >= 0
-
-  loss:
-    loss_name: "default"
-    warprnnt_numba_kwargs:
-      fastemit_lambda: 0.0
+    _target_: nemo.collections.asr.modules.ConvASRDecoder
+    feat_in: ${model.encoder.proj_size}
+    num_classes: -1
+    vocabulary: [ ]
 
   optim:
     name: adam
     # _target_: nemo.core.optim.optimizers.Adam
-    lr: .1
+    lr: .0005
 
     # optimizer arguments
     betas: [ 0.9, 0.999 ]
@@ -148,39 +95,18 @@ model:
       name: CosineAnnealing
 
       # scheduler config override
-      warmup_steps: null
-      warmup_ratio: 0.05
-      min_lr: 1e-6
-      last_epoch: -1
-#  decoder:
-#    _target_: nemo.collections.asr.modules.ConvASRDecoder
-#    feat_in: ${model.encoder.hidden_size}
-#    num_classes: -1
-#    vocabulary: [ ]
-#
-#  optim:
-#    name: adam
-#    lr: 0.0004
-##    lr: 1.0
-#    # optimizer arguments
-#    # less necessity for weight_decay as we already have large augmentations with SpecAug
-#    # you may need weight_decay for large models, stable AMP training, small datasets, or when lower augmentations are used
-#    # weight decay of 0.0 with lr of 2.0 also works fine
-#    #    weight_decay: 1e-2
-#
-#    # scheduler setup
-#    sched:
-#      name: MultiStepLR
-#      milestones: [ 84, 102, 114 ]
-#      last_epoch: -1 # ${trainer.max_epochs}
-#      verbose: true
+      warmup_steps: 100000
+      #      warmup_ratio: 0.05
+      min_lr: 1e-5
+#      last_epoch: -1
+
 
 
 trainer:
-  gpus: 2 # number of GPUs, -1 would use all available GPUs
+  gpus: -1 # number of GPUs, -1 would use all available GPUs
   num_nodes: 1
-  max_epochs: 5
-  max_steps: null # computed at runtime if not set
+  #  max_epochs: 1000
+  max_steps: 400000 # computed at runtime if not set
   val_check_interval: 1.0 # Set to 0.25 to check 4 times per epoch, or an int for number of iterations
   accelerator: ddp
   accumulate_grad_batches: 1
@@ -210,7 +136,7 @@ exp_manager:
     always_save_nemo: True # saves the checkpoints as nemo files instead of PTL checkpoints
 
   # you need to set these two to True to continue the training
-  resume_if_exists: false
+  #  resume_if_exists: true
   resume_ignore_no_checkpoint: false
 
   # You may use this section to create a W&B logger
