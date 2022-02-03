@@ -69,7 +69,7 @@ model:
     hidden_size: ${model.preprocessor.features}
     hidden_init_method: "params"
     num_layers: 16 # 16 increase
-    inner_size: 512 # 512 increase
+    inner_size: 256 # 512 increase
     hidden_steps: 256 # maybe
     hidden_blocks: 8 # not much
     num_attention_heads: 4
