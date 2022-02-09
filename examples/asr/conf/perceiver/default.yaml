@@ -6,11 +6,11 @@ model:
   ctc_reduction: 'mean_batch'
 
   train_ds:
-    manifest_filepath: librispeech/dev_clean.json,./librispeech/train_clean_100.json,./librispeech/train_clean_360.json
+    manifest_filepath: ./librispeech/train_clean_100.json,./librispeech/train_clean_360.json,./librispeech/./librispeech/train_clean_360.json
     sample_rate: ${model.sample_rate}
     batch_size: 32 # you may increase batch_size if your memory allows
-    shuffle: false
-    num_workers: 24
+    shuffle: true
+    num_workers: 240
     pin_memory: true
     use_start_end_token: false
     trim_silence: false
@@ -22,16 +22,16 @@ model:
     sample_rate: ${model.sample_rate}
     batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: false
-    num_workers: 24
+    num_workers: 240
     pin_memory: true
     use_start_end_token: false
 
   test_ds:
-    manifest_filepath: librispeech/dev_clean.json #librispeech/test_clean.json
+    manifest_filepath: librispeech/test_clean.json
     sample_rate: ${model.sample_rate}
     batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: false
-    num_workers: 24
+    num_workers: 240
     pin_memory: true
     use_start_end_token: false
 
@@ -68,23 +68,17 @@ model:
     _target_: nemo.collections.asr.modules.PerceiverEncoder
     hidden_size: ${model.preprocessor.features}
     hidden_init_method: "params"
-    num_layers: 16 # 16 increase
-    inner_size: 256 # 512 increase
-    hidden_steps: 256 # maybe
-    hidden_blocks: 8 # not much
+    num_layers: 32 # 16
+    inner_size: 512 # 512
+    hidden_steps: 512
+    hidden_blocks: 1
     num_attention_heads: 4
     proj_size: 256
-
-  decoder:
-    _target_: nemo.collections.asr.modules.ConvASRDecoder
-    feat_in: ${model.encoder.proj_size}
-    num_classes: -1
-    vocabulary: [ ]
 
   optim:
     name: adam
     # _target_: nemo.core.optim.optimizers.Adam
-    lr: .0005
+    lr: .001
 
     # optimizer arguments
     betas: [ 0.9, 0.999 ]
@@ -95,25 +89,46 @@ model:
       name: CosineAnnealing
 
       # scheduler config override
-      warmup_steps: 100000
-      #      warmup_ratio: 0.05
-      min_lr: 1e-5
-#      last_epoch: -1
+      warmup_steps: 32000
+      min_lr: 1e-6
+      last_epoch: -1
 
+  decoder:
+    _target_: nemo.collections.asr.modules.ConvASRDecoder
+    feat_in: ${model.encoder.proj_size}
+    num_classes: -1
+    vocabulary: [ ]
+#
+#  optim:
+#    name: adam
+#    lr: 0.0004
+##    lr: 1.0
+#    # optimizer arguments
+#    # less necessity for weight_decay as we already have large augmentations with SpecAug
+#    # you may need weight_decay for large models, stable AMP training, small datasets, or when lower augmentations are used
+#    # weight decay of 0.0 with lr of 2.0 also works fine
+#    #    weight_decay: 1e-2
+#
+#    # scheduler setup
+#    sched:
+#      name: MultiStepLR
+#      milestones: [ 84, 102, 114 ]
+#      last_epoch: -1 # ${trainer.max_epochs}
+#      verbose: true
 
 
 trainer:
   gpus: -1 # number of GPUs, -1 would use all available GPUs
   num_nodes: 1
-  #  max_epochs: 1000
+#  max_epochs: 5
   max_steps: 400000 # computed at runtime if not set
   val_check_interval: 1.0 # Set to 0.25 to check 4 times per epoch, or an int for number of iterations
   accelerator: ddp
   accumulate_grad_batches: 1
   gradient_clip_val: 1.0
-  #  amp_level: O0 # O1/O2 for mixed precision
-  precision: 32 # Should be set to 16 for O1 and O2 to enable the AMP.
-  #  amp_backend: apex
+  amp_level: O1 # O1/O2 for mixed precision
+  precision: 16 # Should be set to 16 for O1 and O2 to enable the AMP.
+  amp_backend: apex
   log_every_n_steps: 1  # Interval of logging.
   progress_bar_refresh_rate: 1
   resume_from_checkpoint: null # The path to a checkpoint file to continue the training, restores the whole state including the epoch, step, LR schedulers, apex, etc.
@@ -136,7 +151,7 @@ exp_manager:
     always_save_nemo: True # saves the checkpoints as nemo files instead of PTL checkpoints
 
   # you need to set these two to True to continue the training
-  #  resume_if_exists: true
+  resume_if_exists: false
   resume_ignore_no_checkpoint: false
 
   # You may use this section to create a W&B logger
