@@ -18,6 +18,8 @@ from collections import OrderedDict
 
 import torch
 
+from torch import nn
+
 from nemo.collections.asr.parts.submodules.multi_head_attention import PositionalEncoding, RelPositionalEncoding
 from nemo.core import NeuralModule, Exportable
 from nemo.core.classes.common import typecheck
@@ -48,6 +50,7 @@ class PerceiverEncoder(NeuralModule, Exportable):
             hidden_steps: int = 32,
             hidden_init_method: str = "default",
             hidden_blocks: int = 2,
+            proj_size: int = 256
     ):
         super().__init__()
 
@@ -67,10 +70,10 @@ class PerceiverEncoder(NeuralModule, Exportable):
 
         if self.hidden_init_method == "params":
             # learnable initial hidden values
-            self.init_hidden = torch.nn.Parameter(torch.nn.init.xavier_normal_(torch.empty(hidden_steps, hidden_size)))
+            self.init_hidden = torch.nn.Parameter(torch.nn.init.xavier_normal_(torch.empty(hidden_steps, proj_size)))
             self.init_cross_att = TransformerDecoder(
                 num_layers=1,
-                hidden_size=hidden_size,
+                hidden_size=proj_size,
                 inner_size=inner_size,
                 num_attention_heads=num_attention_heads,
                 attn_score_dropout=attn_score_dropout,
@@ -89,7 +92,7 @@ class PerceiverEncoder(NeuralModule, Exportable):
         # cross-attention encoder
         layer = TransformerDecoder(
             num_layers=1,
-            hidden_size=hidden_size,
+            hidden_size=proj_size,
             inner_size=inner_size,
             num_attention_heads=num_attention_heads,
             attn_score_dropout=attn_score_dropout,
@@ -105,7 +108,7 @@ class PerceiverEncoder(NeuralModule, Exportable):
         # self-attention encoder
         layer = TransformerEncoder(
             num_layers=num_layers,
-            hidden_size=hidden_size,
+            hidden_size=proj_size,
             inner_size=inner_size,
             mask_future=mask_future,
             num_attention_heads=num_attention_heads,
@@ -119,8 +122,10 @@ class PerceiverEncoder(NeuralModule, Exportable):
         self.self_att_layers = torch.nn.ModuleList([copy.deepcopy(layer) for _ in range(hidden_blocks)])
 
         self.pos_enc = RelPositionalEncoding(
-            d_model=hidden_size, dropout_rate=0.1, max_len=5000, xscale=True
+            d_model=proj_size, dropout_rate=0.1, max_len=5000, xscale=True
         )
+
+        self.feat_proj = nn.Linear(hidden_size, proj_size)
 
     @property
     def supported_init_methods(self):
@@ -156,6 +161,7 @@ class PerceiverEncoder(NeuralModule, Exportable):
     def forward(self, audio_signal, length):
         audio_mask = self.make_pad_mask(length, length.max(), length.device)
         audio_signal = audio_signal.transpose(-1, -2)
+        audio_signal = self.feat_proj(audio_signal)
         audio_signal, _ = self.pos_enc(audio_signal)
         # all hidden values are active
         hidden_mask = torch.ones(
