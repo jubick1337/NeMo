@@ -6,11 +6,11 @@ model:
   ctc_reduction: 'mean_batch'
 
   train_ds:
-    manifest_filepath: ./librispeech/train_clean_100.json,./librispeech/train_clean_360.json,./librispeech/train_clean_360.json
+    manifest_filepath: ./librispeech/train_clean_100.json #./librispeech/dev_clean.json #./librispeech/train_clean_100.json,./librispeech/train_clean_360.json,./librispeech/train_clean_360.json
     sample_rate: ${model.sample_rate}
     batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: true
-    num_workers: 240
+    num_workers: 24
     pin_memory: true
     use_start_end_token: false
     trim_silence: false
@@ -22,16 +22,16 @@ model:
     sample_rate: ${model.sample_rate}
     batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: false
-    num_workers: 240
+    num_workers: 24
     pin_memory: true
     use_start_end_token: false
 
   test_ds:
-    manifest_filepath: ./librispeech/test_clean.json
+    manifest_filepath: ./librispeech/dev_clean.json
     sample_rate: ${model.sample_rate}
     batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: false
-    num_workers: 240
+    num_workers: 24
     pin_memory: true
     use_start_end_token: false
 
@@ -68,8 +68,8 @@ model:
     _target_: nemo.collections.asr.modules.PerceiverEncoder
     hidden_size: ${model.preprocessor.features}
     hidden_init_method: "params"
-    num_layers: 32 # 16
-    inner_size: 512 # 512
+    num_layers: 16 # 16
+    inner_size: 1024 # 512
     hidden_steps: 512
     hidden_blocks: 1
     num_attention_heads: 4
@@ -121,8 +121,8 @@ trainer:
   accelerator: ddp
   accumulate_grad_batches: 1
   gradient_clip_val: 1.0
-  amp_level: O1 # O1/O2 for mixed precision
-  precision: 16 # Should be set to 16 for O1 and O2 to enable the AMP.
+  amp_level: O0 # O1/O2 for mixed precision
+  precision: 32 # Should be set to 16 for O1 and O2 to enable the AMP.
   amp_backend: apex
   log_every_n_steps: 1  # Interval of logging.
   progress_bar_refresh_rate: 1
