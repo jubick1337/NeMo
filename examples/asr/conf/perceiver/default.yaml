@@ -58,9 +58,9 @@ model:
 
   spec_augment:
     _target_: nemo.collections.asr.modules.SpectrogramAugmentation
-    freq_masks: 2 # set to zero to disable it
+    freq_masks: 0 # set to zero to disable it
     # you may use lower time_masks for smaller models to have a faster convergence
-    time_masks: 10 # set to zero to disable it
+    time_masks: 0 # set to zero to disable it
     freq_width: 27
     time_width: 0.05
 
@@ -69,11 +69,11 @@ model:
     hidden_size: ${model.preprocessor.features}
     hidden_init_method: "params"
     num_layers: 16 # 16
-    inner_size: 1024 # 512
+    inner_size: 2048 #1024 # 512
     hidden_steps: 512
     hidden_blocks: 1
-    num_attention_heads: 4
-    proj_size: 256
+    num_attention_heads: 8
+    proj_size: 512
 
   optim:
     name: adam
