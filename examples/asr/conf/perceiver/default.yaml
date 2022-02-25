@@ -6,7 +6,7 @@ model:
   ctc_reduction: 'mean_batch'
 
   train_ds:
-    manifest_filepath: ./librispeech/train_clean_100.json #./librispeech/dev_clean.json #./librispeech/train_clean_100.json,./librispeech/train_clean_360.json,./librispeech/train_clean_360.json
+    manifest_filepath: ./librispeech/train_clean_100.json,./librispeech/train_clean_360.json #,./librispeech/train_clean_360.json
     sample_rate: ${model.sample_rate}
     batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: true
@@ -58,9 +58,9 @@ model:
 
   spec_augment:
     _target_: nemo.collections.asr.modules.SpectrogramAugmentation
-    freq_masks: 0 # set to zero to disable it
+    freq_masks: 2 # set to zero to disable it
     # you may use lower time_masks for smaller models to have a faster convergence
-    time_masks: 0 # set to zero to disable it
+    time_masks: 10 # set to zero to disable it
     freq_width: 27
     time_width: 0.05
 
