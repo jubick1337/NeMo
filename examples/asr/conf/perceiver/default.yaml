@@ -8,7 +8,7 @@ model:
   train_ds:
     manifest_filepath: ./librispeech/train_clean_100.json,./librispeech/train_clean_360.json #,./librispeech/train_clean_360.json
     sample_rate: ${model.sample_rate}
-    batch_size: 32 # you may increase batch_size if your memory allows
+    batch_size: 16 # you may increase batch_size if your memory allows
     shuffle: true
     num_workers: 24
     pin_memory: true
@@ -20,7 +20,7 @@ model:
   validation_ds:
     manifest_filepath: ./librispeech/dev_clean.json
     sample_rate: ${model.sample_rate}
-    batch_size: 32 # you may increase batch_size if your memory allows
+    batch_size: 16 # you may increase batch_size if your memory allows
     shuffle: false
     num_workers: 24
     pin_memory: true
@@ -29,7 +29,7 @@ model:
   test_ds:
     manifest_filepath: ./librispeech/dev_clean.json
     sample_rate: ${model.sample_rate}
-    batch_size: 32 # you may increase batch_size if your memory allows
+    batch_size: 16 # you may increase batch_size if your memory allows
     shuffle: false
     num_workers: 24
     pin_memory: true
@@ -68,16 +68,17 @@ model:
     _target_: nemo.collections.asr.modules.PerceiverEncoder
     hidden_size: ${model.preprocessor.features}
     hidden_init_method: "params"
-    num_layers: 16 # 16
-    inner_size: 2048 #1024 # 512
+    num_layers: 8 # 16
+    inner_size: 1024 #1024 # 512
     hidden_steps: 512
-    hidden_blocks: 1
+    hidden_blocks: 4
     num_attention_heads: 8
-    proj_size: 512
+    proj_size: 256
+    share_weight: true
 
   optim:
     name: novograd
-    lr: 0.05
+    lr: 0.0001
 
     # optimizer arguments
     betas: [ 0.8, 0.25 ]
@@ -120,8 +121,8 @@ model:
 trainer:
   gpus: -1 # number of GPUs, -1 would use all available GPUs
   num_nodes: 1
-#  max_epochs: 5
-  max_steps: 400000 # computed at runtime if not set
+  max_epochs: 100
+#  max_steps: 400000 # computed at runtime if not set
   val_check_interval: 1.0 # Set to 0.25 to check 4 times per epoch, or an int for number of iterations
   accelerator: ddp
   accumulate_grad_batches: 1

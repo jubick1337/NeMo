@@ -50,7 +50,8 @@ class PerceiverEncoder(NeuralModule, Exportable):
             hidden_steps: int = 32,
             hidden_init_method: str = "default",
             hidden_blocks: int = 2,
-            proj_size: int = 256
+            proj_size: int = 256,
+            share_weight: bool = False
     ):
         super().__init__()
 
@@ -103,8 +104,10 @@ class PerceiverEncoder(NeuralModule, Exportable):
             pre_ln_final_layer_norm=pre_ln_final_layer_norm,
         )
         layer.diagonal = None
-        self.cross_att_layers = torch.nn.ModuleList([copy.deepcopy(layer) for _ in range(hidden_blocks)])
-
+        if share_weight:
+            self.cross_att_layers = torch.nn.ModuleList([layer for _ in range(hidden_blocks)])
+        else:
+            self.cross_att_layers = torch.nn.ModuleList([copy.deepcopy(layer) for _ in range(hidden_blocks)])
         # self-attention encoder
         layer = TransformerEncoder(
             num_layers=num_layers,
@@ -119,8 +122,10 @@ class PerceiverEncoder(NeuralModule, Exportable):
             pre_ln=pre_ln,
             pre_ln_final_layer_norm=pre_ln_final_layer_norm,
         )
-        self.self_att_layers = torch.nn.ModuleList([copy.deepcopy(layer) for _ in range(hidden_blocks)])
-
+        if share_weight:
+            self.self_att_layers = torch.nn.ModuleList([layer for _ in range(hidden_blocks)])
+        else:
+            self.self_att_layers = torch.nn.ModuleList([copy.deepcopy(layer) for _ in range(hidden_blocks)])
         self.pos_enc = RelPositionalEncoding(
             d_model=proj_size, dropout_rate=0.1, max_len=5000, xscale=True
         )
@@ -171,6 +176,7 @@ class PerceiverEncoder(NeuralModule, Exportable):
         audio_mask = audio_mask.to(length.dtype)
 
         # initialize hidden state
+
         if self._hidden_init_method == "params":
             # initialize latent with learned parameters
             hidden_states = self.init_hidden.unsqueeze(0).expand(audio_signal.shape[0], -1, -1)
@@ -187,9 +193,10 @@ class PerceiverEncoder(NeuralModule, Exportable):
 
         # apply block (cross-attention, self-attention) multiple times
         # for block in range(self._hidden_blocks):
+        print('start')
         for self_att, cross_att in zip(self.self_att_layers, self.cross_att_layers):
             residual = hidden_states
-
+            print(residual.norm())
             # cross attention of hidden over encoder states
             hidden_states = cross_att(
                 decoder_states=hidden_states,
@@ -203,9 +210,10 @@ class PerceiverEncoder(NeuralModule, Exportable):
 
             # residual connection
             hidden_states += residual
-
+        print('end')
         hidden_mask = hidden_mask.sum(-1)
         hidden_states = hidden_states.transpose(-1, -2)
+        # print(hidden_states.size())
         return hidden_states, hidden_mask
 
     @property

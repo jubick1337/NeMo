@@ -575,6 +575,12 @@ class EncDecCTCModel(ASRModel, ExportableEncDecModel, ASRModuleMixin):
         loss_value = self.loss(
             log_probs=log_probs, targets=transcript, input_lengths=encoded_len, target_lengths=transcript_len
         )
+        # print(f'log_probs.size():{log_probs.size()}')
+        # print(f'transcript.size():{transcript.size()}')
+        # print(f'encoded_len.size():{encoded_len.size()}')
+        # print(f'transcript_len.size():{transcript_len.size()}')
+        # print(f'self.max_length:{self.max_length}')
+        # self.max_length = max(self.max_length, transcript.size()[-1])
 
         tensorboard_logs = {'train_loss': loss_value, 'learning_rate': self._optimizer.param_groups[0]['lr']}
 
