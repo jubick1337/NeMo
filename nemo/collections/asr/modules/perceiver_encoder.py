@@ -193,10 +193,10 @@ class PerceiverEncoder(NeuralModule, Exportable):
 
         # apply block (cross-attention, self-attention) multiple times
         # for block in range(self._hidden_blocks):
-        print('start')
+        # print('start')
         for self_att, cross_att in zip(self.self_att_layers, self.cross_att_layers):
             residual = hidden_states
-            print(residual.norm())
+            # print(residual.norm())
             # cross attention of hidden over encoder states
             hidden_states = cross_att(
                 decoder_states=hidden_states,
@@ -210,7 +210,7 @@ class PerceiverEncoder(NeuralModule, Exportable):
 
             # residual connection
             hidden_states += residual
-        print('end')
+        # print('end')
         hidden_mask = hidden_mask.sum(-1)
         hidden_states = hidden_states.transpose(-1, -2)
         # print(hidden_states.size())
