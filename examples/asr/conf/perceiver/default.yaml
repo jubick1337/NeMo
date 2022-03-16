@@ -69,9 +69,9 @@ model:
     hidden_size: ${model.preprocessor.features}
     hidden_init_method: "params"
     num_layers: 8 # 16
-    inner_size: 1024 #1024 # 512
-    hidden_steps: 512
-    hidden_blocks: 4
+    inner_size: 512 #1024 # 512
+    hidden_steps: 128
+    hidden_blocks: 16
     num_attention_heads: 8
     proj_size: 256
     share_weight: true
@@ -121,8 +121,8 @@ model:
 trainer:
   gpus: -1 # number of GPUs, -1 would use all available GPUs
   num_nodes: 1
-  max_epochs: 100
-#  max_steps: 400000 # computed at runtime if not set
+#  max_epochs: 100
+  max_steps: 400000 # computed at runtime if not set
   val_check_interval: 1.0 # Set to 0.25 to check 4 times per epoch, or an int for number of iterations
   accelerator: ddp
   accumulate_grad_batches: 1
