@@ -8,7 +8,7 @@ model:
   train_ds:
     manifest_filepath: ./librispeech/train_clean_100.json,./librispeech/train_clean_360.json #,./librispeech/train_clean_360.json
     sample_rate: ${model.sample_rate}
-    batch_size: 16 # you may increase batch_size if your memory allows
+    batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: true
     num_workers: 24
     pin_memory: true
@@ -20,7 +20,7 @@ model:
   validation_ds:
     manifest_filepath: ./librispeech/dev_clean.json
     sample_rate: ${model.sample_rate}
-    batch_size: 16 # you may increase batch_size if your memory allows
+    batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: false
     num_workers: 24
     pin_memory: true
@@ -29,7 +29,7 @@ model:
   test_ds:
     manifest_filepath: ./librispeech/dev_clean.json
     sample_rate: ${model.sample_rate}
-    batch_size: 16 # you may increase batch_size if your memory allows
+    batch_size: 32 # you may increase batch_size if your memory allows
     shuffle: false
     num_workers: 24
     pin_memory: true
@@ -69,9 +69,9 @@ model:
     hidden_size: ${model.preprocessor.features}
     hidden_init_method: "params"
     num_layers: 8 # 16
-    inner_size: 512 #1024 # 512
-    hidden_steps: 128
-    hidden_blocks: 16
+    inner_size: 512 # 512
+    hidden_steps: 256
+    hidden_blocks: 8
     num_attention_heads: 8
     proj_size: 256
     share_weight: true
