@@ -3,6 +3,7 @@
 Punctuation and Capitalization Lexical Audio Model
 ====================================
 
+<<<<<<< HEAD
 Automatic Speech Recognition (ASR) systems typically generate text with no punctuation and capitalization of the words.
 There are two issues with non-punctuated ASR output:
 
@@ -14,6 +15,21 @@ There are two issues with non-punctuated ASR output:
 But sometimes punctuation and capitalization cannot be restored based only on text. In this case we can use audio to improve model's accuracy.
 
 You can find more details on each section in `Punctuation And Capitalization's page <https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/nlp/punctuation_and_capitalization.html>`_.
+=======
+Sometimes punctuation and capitalization cannot be restored based only on text. In this case we can use audio to improve model's accuracy.
+
+Like in these examples:
+
+.. code::
+  
+  Oh yeah? or Oh yeah.
+
+  We need to go? or We need to go.
+
+  Yeah, they make you work. Yeah, over there you walk a lot? or Yeah, they make you work. Yeah, over there you walk a lot.
+
+You can find more details on text only punctuation and capitalization in `Punctuation And Capitalization's page <https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/nlp/punctuation_and_capitalization.html>`_. In this document, we focus on model changes needed to use acoustic features.
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 
 Quick Start Guide
 -----------------
@@ -25,14 +41,20 @@ Quick Start Guide
     # to get the list of pre-trained models
     PunctuationCapitalizationLexicalAudioModel.list_available_models()
 
+<<<<<<< HEAD
     # Download and load the pre-trained BERT-based model
     model = PunctuationCapitalizationLexicalAudioModel.from_pretrained("PLACEHOLDER")
+=======
+    # Download and load the pre-trained model
+    model = PunctuationCapitalizationLexicalAudioModel.from_pretrained("<PATH to .nemo file>")
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 
     # try the model on a few examples
     model.add_punctuation_capitalization(['how are you', 'great how about you'], audio_queries=['/path/to/1.wav', '/path/to/2.wav'], target_sr=16000)
 
 Model Description
 -----------------
+<<<<<<< HEAD
 In the addition to Punctuation and Capitalization model we add audio encoder (e.g. Conformer's encoder) and attention based fusion of lexical and audio features.
 This model architecture is based on `Multimodal Semi-supervised Learning Framework for Punctuation Prediction in Conversational Speech <https://arxiv.org/pdf/2008.00702.pdf>`_.
 
@@ -42,6 +64,13 @@ This model architecture is based on `Multimodal Semi-supervised Learning Framewo
 
     Connect to an instance with a GPU (**Runtime** -> **Change runtime type** -> select **GPU** for the hardware accelerator).
 
+=======
+In addition to `Punctuation And Capitalization model <https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/nlp/punctuation_and_capitalization.html>`_ we add audio encoder (e.g. Conformer's encoder) and attention based fusion of lexical and audio features.
+This model architecture is based on `Multimodal Semi-supervised Learning Framework for Punctuation Prediction in Conversational Speech <https://arxiv.org/pdf/2008.00702.pdf>`__ :cite:`nlp-punct-sunkara20_interspeech`.
+
+.. note::
+
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
     An example script on how to train and evaluate the model can be found at: `NeMo/examples/nlp/token_classification/punctuation_capitalization_lexical_audio_train_evaluate.py <https://github.com/NVIDIA/NeMo/blob/stable/examples/nlp/token_classification/punctuation_capitalization_lexical_audio_train_evaluate.py>`__.
 
     The default configuration file for the model can be found at: `NeMo/examples/nlp/token_classification/conf/punctuation_capitalization_lexical_audio_config.yaml <https://github.com/NVIDIA/NeMo/blob/stable/examples/nlp/token_classification/conf/punctuation_capitalization_lexical_audio_config.yaml>`__.
@@ -93,6 +122,13 @@ For creating of tarred dataset with audio you will need data in NeMo format:
         --audio_file <PATH/TO/AUDIO/PATHS/FILE> \
         --sample_rate 16000 
 
+<<<<<<< HEAD
+=======
+.. note::
+  You can change sample rate to any positive integer. It will be used in constructor of :class:`~nemo.collections.asr.parts.preprocessing.AudioSegment`. It is recomended to set ``sample_rate`` to the same value as data which was used during training of ASR model.
+
+
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 Training Punctuation and Capitalization Model
 ---------------------------------------------
 
@@ -101,6 +137,7 @@ You can freeze audio encoder during training and add additional ``ConformerLayer
 An example of a model configuration file for training the model can be found at:
 `NeMo/examples/nlp/token_classification/conf/punctuation_capitalization_lexical_audio_config.yaml <https://github.com/NVIDIA/NeMo/blob/stable/examples/nlp/token_classification/conf/punctuation_capitalization_lexical_audio_config.yaml>`__.
 
+<<<<<<< HEAD
 .. _run-config-label:
 
 Run config
@@ -151,10 +188,17 @@ An example of a config file is
        :class:`~nemo.utils.exp_manager.exp_manager`.
 
 .. _model-config-label:
+=======
+Configs
+^^^^^^^^^^^^
+.. note::
+  This page contains only parameters specific to lexical and audio model. Others parameters can be found in `Punctuation And Capitalization's page <https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/nlp/punctuation_and_capitalization.html>`_.
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 
 Model config
 ^^^^^^^^^^^^
 
+<<<<<<< HEAD
 .. list-table:: Location of model config in parent config
    :widths: 5 5
    :header-rows: 1
@@ -164,6 +208,8 @@ Model config
    * - :ref:`Run config<run-config-label>`
      - ``model``
 
+=======
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 A configuration of
 :class:`~nemo.collections.nlp.models.token_classification.punctuation_capitalization_lexical_audio_model.PunctuationCapitalizationLexicalAudioModel`
 model.
@@ -176,6 +222,7 @@ model.
      - **Data type**
      - **Default value**
      - **Description**
+<<<<<<< HEAD
    * - **class_labels**
      - :ref:`class labels config<class-labels-config-label>`
      - :ref:`class labels config<class-labels-config-label>`
@@ -223,11 +270,14 @@ model.
      - A configuration of optimizer, learning rate scheduler, and L2 regularization. Cannot be omitted in `.yaml`
        config if training is performed. For more information see :ref:`Optimization <optimization-label>` and
        `primer <https://github.com/NVIDIA/NeMo/blob/main/tutorials/00_NeMo_Primer.ipynb>`_ tutorial.
+=======
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
    * - **audio_encoder** 
      - :ref:`audio encoder config<audio-encoder-config-label>`
      - :ref:`audio encoder config<audio-encoder-config-label>`
      - A configuration for audio encoder.
 
+<<<<<<< HEAD
 .. _class-labels-config-label:
 
 Class labels config
@@ -336,6 +386,8 @@ defines on which tokens loss is computed.
        first lines of ``model.class_labels`` files.
 
 .. _data-config-label:
+=======
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 
 Data config
 ^^^^^^^^^^^
@@ -351,6 +403,7 @@ Data config
    * - :ref:`Model config<model-config-label>`
      - ``train_ds``, ``validation_ds``, ``test_ds``
 
+<<<<<<< HEAD
 For convenience, items of data config are described in 4 tables:
 :ref:`common parameters for both regular and tarred datasets<common-data-parameters-label>`,
 :ref:`parameters which are applicable only to regular dataset<regular-dataset-parameters-label>`,
@@ -392,6 +445,8 @@ For convenience, items of data config are described in 4 tables:
        You may need this parameter if dataset directory is read-only and thus does not allow saving anything near
        dataset files.
 
+=======
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 .. _regular-dataset-parameters-label:
 
 .. list-table:: Parameters for regular (:class:`~nemo.collections.nlp.data.token_classification.punctuation_capitalization_dataset.BertPunctuationCapitalizationDataset`) dataset
@@ -402,6 +457,7 @@ For convenience, items of data config are described in 4 tables:
      - **Data type**
      - **Default value**
      - **Description**
+<<<<<<< HEAD
    * - **text_file**
      - string
      - ``null``
@@ -462,6 +518,8 @@ For convenience, items of data config are described in 4 tables:
        multiprocessing is not used; if ``null``, then ``n_jobs`` will be equal to the number of CPU cores. WARNING:
        there can be weird deadlocking errors with some tokenizers (e.g. SentencePiece) if ``n_jobs`` is greater than
        zero.
+=======
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
    * - **use_audio**
      - bool
      - ``false``
@@ -483,6 +541,7 @@ For convenience, items of data config are described in 4 tables:
      - ``true``
      - If set to True batches will include waveforms, if set to False will store audio_filepaths instead and load audios during ``collate_fn`` call.
     
+<<<<<<< HEAD
 .. _tarred-dataset-parameters-label:
 
 .. list-table:: Parameters for tarred (:class:`~nemo.collections.nlp.data.token_classification.punctuation_capitalization_tarred_dataset.BertPunctuationCapitalizationTarredDataset`) dataset
@@ -703,6 +762,8 @@ A configuration of a source text tokenizer.
      - string
      - ``null``
      - A path to a tokenizer model required for ``'sentencepiece'`` tokenizer.
+=======
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 
 .. _audio-encoder-config-label:
 
@@ -710,8 +771,13 @@ Audio Encoder config
 ^^^^^^^^^^^^^^^^
 
 .. list-table:: Audio Encoder Config
+<<<<<<< HEAD
     :widths: 5 5 10 25
     :header-rows: 1
+=======
+   :widths: 5 5 10 25
+   :header-rows: 1
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 
    * - **Parameter**
      - **Data type**
@@ -734,11 +800,20 @@ Audio Encoder config
      - :ref:`fusion config<fusion-config-label>`
      - Configuration for fusion.
 
+<<<<<<< HEAD
 .. _freeze-config-label:
 
 .. list-table:: Freeze Config
     :widths: 5 5 10 25
     :header-rows: 1
+=======
+
+.. _freeze-config-label:
+
+.. list-table:: Freeze Config
+   :widths: 5 5 10 25
+   :header-rows: 1
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 
    * - **Parameter**
      - **Data type**
@@ -761,11 +836,20 @@ Audio Encoder config
      - ``4``
      - Number of additional ``ConformerLayer`` layers.
 
+<<<<<<< HEAD
 .. _adapter-config-label:
 
 .. list-table:: Adapter Config
     :widths: 5 5 10 25
     :header-rows: 1
+=======
+
+.. _adapter-config-label:
+
+.. list-table:: Adapter Config
+   :widths: 5 5 10 25
+   :header-rows: 1
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 
    * - **Parameter**
      - **Data type**
@@ -780,11 +864,20 @@ Audio Encoder config
      - ``null``
      - For more details see `nemo.collections.common.parts.LinearAdapterConfig <https://github.com/NVIDIA/NeMo/blob/main/nemo/collections/common/parts/adapter_modules.py#L141>`_ class.
 
+<<<<<<< HEAD
 .. _fusion-config-label:
 
 .. list-table:: Fusion Config
     :widths: 5 5 10 25
     :header-rows: 1
+=======
+
+.. _fusion-config-label:
+
+.. list-table:: Fusion Config
+   :widths: 5 5 10 25
+   :header-rows: 1
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 
    * - **Parameter**
      - **Data type**
@@ -804,6 +897,10 @@ Audio Encoder config
      - Fusion inner size.
 
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 Model training
 ^^^^^^^^^^^^^^
 
@@ -864,12 +961,17 @@ Inference is performed by a script `examples/nlp/token_classification/punctuate_
     python punctuate_capitalize_infer.py \
         --input_manifest <PATH/TO/INPUT/MANIFEST> \
         --output_manifest <PATH/TO/OUTPUT/MANIFEST> \
+<<<<<<< HEAD
         --pretrained_name PLACEHOLDER \
+=======
+        --pretrained_name <PATH to .nemo file> \
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
         --max_seq_length 64 \
         --margin 16 \
         --step 8 \
         --use_audio
 
+<<<<<<< HEAD
 :code:`<PATH/TO/INPUT/MANIFEST>` is a path to NeMo :ref:`ASR manifest<LibriSpeech_dataset>` with text in which you need to
 restore punctuation and capitalization. If manifest contains :code:`'pred_text'` key, then :code:`'pred_text'` elements
 will be processed. Otherwise, punctuation and capitalization will be restored in :code:`'text'` elements.
@@ -900,6 +1002,9 @@ segments :code:`[['[CLS]', 'h', 'e', 'l', '[SEP]'], ['[CLS]', 'e', 'l', 'l', '[S
 Before calculating final predictions, probabilities for tokens marked by asterisk are removed: :code:`[['[CLS]', 'h', 'e', 'l'*, '[SEP]'*], ['[CLS]'*, 'e'*, 'l', 'l'*, '[SEP]'*], ['[CLS]'*, 'l'*, 'l', 'o', '[SEP]']]`
 
 Long audios are split into corresponding sequences of :code:`4000 * max_seq_length`.
+=======
+Long audios are split just like in text only case, audio sequences treated the same as text seqences except :code:`max_seq_length` for audio equals :code:`max_seq_length*4000`.
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 
 Model Evaluation
 ----------------
@@ -917,11 +1022,19 @@ To start evaluation of the pre-trained model, run:
 
 .. code::
 
+<<<<<<< HEAD
     python punctuation_capitalization_train_evaluate.py \
            +model.do_training=false \
            +model.to_testing=true \
            model.test_ds.ds_item=<PATH/TO/TEST/DATA/DIR>  \
            pretrained_model=PLACEHOLDER \
+=======
+    python punctuation_capitalization_lexical_audio_train_evaluate.py \
+           +model.do_training=false \
+           +model.to_testing=true \
+           model.test_ds.ds_item=<PATH/TO/TEST/DATA/DIR>  \
+           pretrained_model=<PATH to .nemo file> \
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
            model.test_ds.text_file=<NAME_OF_TEST_INPUT_TEXT_FILE> \
            model.test_ds.labels_file=<NAME_OF_TEST_LABELS_FILE> \
            model.test_ds.audio_file=<NAME_OF_TEST_AUDIO_FILE>
@@ -931,6 +1044,7 @@ Required Arguments
 ^^^^^^^^^^^^^^^^^^
 
 - :code:`pretrained_model`: pretrained Punctuation and Capitalization Lexical Audio model from ``list_available_models()`` or path to a ``.nemo``
+<<<<<<< HEAD
   file. For example: ``PLACEHOLDER`` or ``your_model.nemo``.
 - :code:`model.test_ds.ds_item`: path to the directory that contains :code:`model.test_ds.text_file`, :code:`model.test_ds.labels_file` and :code:`model.test_ds.audio_file`
 
@@ -943,6 +1057,11 @@ one for punctuation task. This classification reports include the following metr
 
 More details about these metrics can be found `here <https://en.wikipedia.org/wiki/Precision_and_recall>`__.
 
+=======
+  file. For example: ``your_model.nemo``.
+- :code:`model.test_ds.ds_item`: path to the directory that contains :code:`model.test_ds.text_file`, :code:`model.test_ds.labels_file` and :code:`model.test_ds.audio_file`
+
+>>>>>>> dd9a30f55b7ec308cc3b55751e8ae5aa40f36a62
 References
 ----------
 
