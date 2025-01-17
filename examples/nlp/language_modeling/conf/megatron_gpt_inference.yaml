@@ -1,13 +1,13 @@
 # NOTE : This config and megatron_gpt_eval.py will be deprecated soon. Use megatron_gpt_inference_batch_mcore.yaml
 inference:
-  greedy: False # Whether or not to use sampling ; use greedy decoding otherwise
+  greedy: True # Whether or not to use sampling ; use greedy decoding otherwise
   top_k: 0  # The number of highest probability vocabulary tokens to keep for top-k-filtering.
-  top_p: 0.9 # If set to float < 1, only the most probable tokens with probabilities that add up to top_p or higher are kept for generation.
+  top_p: 1.0 # If set to float < 1, only the most probable tokens with probabilities that add up to top_p or higher are kept for generation.
   temperature: 1.0 # sampling temperature
   add_BOS: True # add the bos token at the begining of the prompt
   tokens_to_generate: 30 # The minimum length of the sequence to be generated.
   all_probs: False  # whether return the log prob for all the tokens in vocab
-  repetition_penalty: 1.2  # The parameter for repetition penalty. 1.0 means no penalty.
+  repetition_penalty: 1.0  # The parameter for repetition penalty. 1.0 means no penalty.
   min_tokens_to_generate: 0  # The minimum length of the sequence to be generated.
   compute_logprob: False  # a flag used to compute logprob of all the input text, a very special case of running inference, default False
   end_strings: ["<|endoftext|>"]  # generation will stop when one of these tokens is generated
@@ -30,8 +30,8 @@ checkpoint_dir: null # checkpoint file dir. This is used to load the PTL checkpo
 checkpoint_name: null # PTL checkpoint file name, only used for PTL checkpoint loading
 hparams_file: null # model configuration file, only used for PTL checkpoint loading
 prompts: # prompts for GPT inference
-  - "Q: How are you?"
-  - "Q: How big is the universe?"
+  - "Give me a short introduction to large language model."
+  - "What is 2+2?"
 prompts_jsonl: null
 server: False  # whether launch the API server
 port: 5555 # the port number for the inference server
@@ -92,6 +92,9 @@ chatbot_config:
       type: list
       default: en
    
-  user: User
-  assistant: Assistant
-  system: "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n\n"
+  user: user
+  assistant: assistant
+  system: "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."
+
+# 'Certainly! A large language model is an artificial intelligence system that can generate human-like text. These models have been trained on vast amounts of data, allowing them to understand and produce coherent and contextually appropriate responses. They are widely used in various fields such as natural language processing (NLP), machine translation, sentiment analysis, and more. Large language models can process complex sentences and provide accurate and informative responses to users or AI systems. Their ability to learn from interactions with humans has made them highly effective tools for tasks like chatbots, virtual assistants, and language translation.'
+# Large language models are artificial intelligence models that are designed to generate human-like text. They are trained on large amounts of text data, such as books

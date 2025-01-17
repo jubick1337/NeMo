@@ -85,7 +85,8 @@ def load_config(args, qwen_config):
     # use HF tokenizer
     tokenizer_dict = {
         'library': 'huggingface',
-        'type': args.input_name_or_path,
+        # 'type': args.input_name_or_path,
+        "type" : "Qwen/Qwen2.5-0.5B-Instruct",
         'use_fast': True,
         'trust_remote_code': True,
     }

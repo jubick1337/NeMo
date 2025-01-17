@@ -16,9 +16,11 @@ import asyncio
 import datetime
 import json
 import os
+import random
 import threading
 from functools import partial
 
+import numpy as np
 import torch
 from lightning.pytorch.trainer.trainer import Trainer
 from omegaconf import OmegaConf, open_dict
@@ -43,7 +45,12 @@ try:
 except (ImportError, ModuleNotFoundError):
 
     HAVE_MEGATRON_CORE = False
-
+seed = 228
+torch.manual_seed(seed)
+np.random.seed(seed)
+random.seed(seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 """
 This is the script to run GPT text generation.
 
@@ -368,6 +375,7 @@ def main(cfg) -> None:
             nb_paddings += [''] * nb_paddings
 
     # First method of running text generation, call model.generate method
+    print(f'Running text generation with prompts: {prompts}')
     response = model.generate(inputs=prompts, length_params=length_params, sampling_params=sampling_params)
 
     if fp8_enabled:

@@ -17,6 +17,7 @@ from typing import List, Optional
 
 from transformers import AutoTokenizer as AUTOTOKENIZER
 
+from nemo.collections.common.tokenizers.chat_template_mixin import ChatTemplateMixin
 from nemo.collections.common.tokenizers.tokenizer_spec import TokenizerSpec
 from nemo.utils import logging
 
@@ -25,7 +26,7 @@ __all__ = [
 ]
 
 
-class AutoTokenizer(TokenizerSpec):
+class AutoTokenizer(TokenizerSpec, ChatTemplateMixin):
     """
     Wrapper of HuggingFace AutoTokenizer https://huggingface.co/transformers/model_doc/auto.html#autotokenizer.
 
@@ -307,3 +308,7 @@ class AutoTokenizer(TokenizerSpec):
     def save_pretrained(self, save_directory: str):
         """Saves tokenizer's vocabulary and other artifacts to the specified directory"""
         return self.tokenizer.save_pretrained(save_directory)
+
+    @property
+    def chat_template(self):
+        return self.tokenizer.chat_template
